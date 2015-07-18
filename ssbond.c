@@ -3,11 +3,11 @@
    Program:    ssbond
    File:       ssbond.c
    
-   Version:    V2.0
-   Date:       08.07.96
+   Version:    V2.1
+   Date:       20.10.14
    Function:   Do conf search for potential disulphides
    
-   Copyright:  (c) Dr. Andrew C. R. Martin 1995
+   Copyright:  (c) Dr. Andrew C. R. Martin 1995-2014
    Author:     Dr. Andrew C. R. Martin
    Address:    Biomolecular Structure & Modelling Unit,
                Department of Biochemistry & Molecular Biology,
@@ -48,6 +48,8 @@
    V1.0  25.10.88 Original FORTRAN version
    V1.1  08.10.93 Various fixes while at DKfz
    V2.0  08.07.96 Rewritten in C to support chain names and inserts
+   V2.1  20.10.14 Adds CB atoms to glycines so these can be handled.
+                  Changed to new BiopLib function names
 
 *************************************************************************/
 /* Includes
@@ -123,10 +125,17 @@ int main(int argc, char **argv)
       if(rspec1[0] != '\0' && rspec2[0] != '\0')
          DoLoop = FALSE;
 
-      if(OpenStdFiles(infile, outfile, &in, &out))
+      if(blOpenStdFiles(infile, outfile, &in, &out))
       {
-         if((pdb=ReadPDB(in, &natoms))!=NULL)
+         if((pdb=blReadPDB(in, &natoms))!=NULL)
          {
+            /* 20.10.14 V2.1                                            */
+            if(!blAddCBtoAllGly(pdb))
+            {
+               fprintf(stderr,"Unable to add CB to glycines\n");
+               return(1);
+            }
+            
             if(DoLoop)
             {
                while(GetResSpecs(rspec1, rspec2))
@@ -230,11 +239,11 @@ BOOL DoSearch(FILE *out, PDB *pdb, REAL bond, REAL angle, REAL dIdeal,
    Count = 0;
    for(ang1=0.0; ang1<(2.0*PI-(step/2.0)); ang1+=step)
    {
-      TorToCoor(N1, CA1, CB1, bond, angle, ang1, &SG1);
+      blTorToCoor(N1, CA1, CB1, bond, angle, ang1, &SG1);
       
       for(ang2=0.0; ang2<(2.0*PI-(step/2.0)); ang2+=step)
       {
-         TorToCoor(N2, CA2, CB2, bond, angle, ang2, &SG2);
+         blTorToCoor(N2, CA2, CB2, bond, angle, ang2, &SG2);
          d2 = DISTSQ((&SG1),(&SG2));
          ang1Array[Count] = ang1;
          ang2Array[Count] = ang2;
@@ -244,7 +253,7 @@ BOOL DoSearch(FILE *out, PDB *pdb, REAL bond, REAL angle, REAL dIdeal,
    }
    
    /* Index sort the diffArray                                          */
-   IndexReal(diffArray, Indx, Count);
+   blIndexReal(diffArray, Indx, Count);
    
    /* Print the best orientations                                       */
    fprintf(out,"\nBest orientations are (CA-CB-SG = %.2f):\n",
@@ -259,13 +268,13 @@ X       Y       Z       DIST    CHI3\n");
    
    for(i=0; i<nbest; i++)
    {
-      TorToCoor(N1, CA1, CB1, bond, angle, ang1Array[Indx[i]], &SG1);
-      TorToCoor(N2, CA2, CB2, bond, angle, ang2Array[Indx[i]], &SG2);
+      blTorToCoor(N1, CA1, CB1, bond, angle, ang1Array[Indx[i]], &SG1);
+      blTorToCoor(N2, CA2, CB2, bond, angle, ang2Array[Indx[i]], &SG2);
    
-      chi3=phi(CB1.x, CB1.y, CB1.z,
-               SG1.x, SG1.y, SG1.z, 
-               SG2.x, SG2.y, SG2.z,
-               CB2.x, CB2.y, CB2.z);
+      chi3=blPhi(CB1.x, CB1.y, CB1.z,
+                 SG1.x, SG1.y, SG1.z, 
+                 SG2.x, SG2.y, SG2.z,
+                 CB2.x, CB2.y, CB2.z);
 
       dist=DIST((&SG1), (&SG2));
       
@@ -285,7 +294,7 @@ Cleanup:
    if(ang1Array!=NULL) free(ang1Array);
    if(diffArray!=NULL) free(diffArray);
 
-   return(TRUE);
+   return(RetVal);
 }
 
 /************************************************************************/
@@ -405,7 +414,7 @@ BOOL ParseCmdLine(int argc, char **argv, char *infile, char *outfile,
 */
 void Usage(void)
 {
-   fprintf(stderr,"\nSSBond V2.0 (c) 1989-1996 Dr. Andrew C.R. Martin \
+   fprintf(stderr,"\nSSBond V2.1 (c) 1989-1996 Dr. Andrew C.R. Martin \
 LMB Oxford, DKfz, UCL\n");
 
    fprintf(stderr,"\nUsage: ssbond [-b bondlen] [-a angle] [-d dideal] \
@@ -491,9 +500,9 @@ BOOL FindCoords(PDB *pdb, char *rspec, VEC3F *N, VEC3F *CA, VEC3F *CB)
    CB->x = CB->y = CB->z = (REAL)9999.000;
    
    /* Find the boundaries of the specified residue                      */
-   if((start = FindResidueSpec(pdb, rspec)) == NULL)
+   if((start = blFindResidueSpec(pdb, rspec)) == NULL)
       return(FALSE);
-   stop = FindNextResidue(start);
+   stop = blFindNextResidue(start);
    
    /* Find the atoms in that residue                                    */
    for(p=start; p!=stop; NEXT(p))
