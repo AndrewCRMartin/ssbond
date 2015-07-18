@@ -1,0 +1,31 @@
+COPT	= -O3 
+LINK1	= 
+LINK2	=
+CC	= cc
+
+EXE	= ssbond
+OFILES	= ssbond.o
+LFILES  = bioplib/ReadPDB.o \
+  bioplib/chindex.o \
+  bioplib/FindResidueSpec.o  \
+  bioplib/FindResidue.o  \
+  bioplib/ParseRes.o  \
+  bioplib/IndxReal.o \
+  bioplib/phi.o \
+  bioplib/TorCoor.o \
+  bioplib/FindNextResidue.o \
+  bioplib/fsscanf.o \
+  bioplib/padterm.o \
+  bioplib/OpenStdFiles.o  \
+  bioplib/upstrncmp.o
+
+
+$(EXE) : $(OFILES) $(LFILES)
+	$(CC) -o $(EXE) $(OFILES) $(LFILES) -lm $(LINK2)
+.c.o :
+	$(CC) $(COPT) -o $@ -c $<
+
+clean :
+	/bin/rm -f $(OFILES) $(LFILES)
+distclean : clean
+	/bin/rm -f $(EXE)
