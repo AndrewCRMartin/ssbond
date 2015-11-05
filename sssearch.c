@@ -3,19 +3,13 @@
    Program:    sssearch
    File:       ssearch.c
    
-   Version:    V1.1
-   Date:       04.07.96
+   Version:    V1.2
+   Date:       05.11.15
    Function:   Search for potential disulphide bonding sites
    
-   Copyright:  (c) SciTech Software 1993-6
+   Copyright:  (c) SciTech Software 1993-2015
    Author:     Dr. Andrew C. R. Martin
-   Address:    SciTech Software
-               23, Stag Leys,
-               Ashtead,
-               Surrey,
-               KT21 2TD.
-   Phone:      +44 (0)1372 275775
-   EMail:      andrew@stagleys.demon.co.uk
+   EMail:      andrew@bioinf.org.uk
                
 **************************************************************************
 
@@ -34,7 +28,7 @@
    Description:
    ============
    Performs a simple search for potential disulphide bond introduction
-   sites by looking at the distances between CBs.
+`   sites by looking at the distances between CBs.
 
    Obviously, this rules out any residues which are currently glycines,
    but this is probably a good idea anyway.
@@ -57,6 +51,8 @@
    =================
    V1.0  12.10.93 Original
    V1.1  04.07.96 Moved ; one to right in output and added stdlib.h
+   V1.2  05.11.15 Code cleanup and changed to use routines from new 
+                  bioplib
 
 *************************************************************************/
 /* Includes
@@ -126,6 +122,7 @@ void DoRanking(void);
    Main program for disulphide searching
 
    12.10.93 Original   By: ACRM
+   05.11.15 Added return value
 */
 int main(int argc, char **argv)
 {
@@ -148,6 +145,7 @@ int main(int argc, char **argv)
          }
       }
    }
+   return(0);
 }
 
 /*************************************************************************/
@@ -244,7 +242,7 @@ PDB *OpenAndReadPDB(char *file, FILE *Msgfp)
    }
    else
    {
-      pdb = ReadPDB(fp, &natoms);
+      pdb = blReadPDB(fp, &natoms);
       if(pdb == NULL || natoms == 0)
       {
          if(Msgfp!=NULL) 
@@ -263,6 +261,7 @@ PDB *OpenAndReadPDB(char *file, FILE *Msgfp)
    The main command parser loop.
 
    10.10.93 Original    By: ACRM
+   05.11.15 Added final return value
 */
 BOOL DoParseLoop(PDB *pdb)
 {
@@ -274,7 +273,7 @@ BOOL DoParseLoop(PDB *pdb)
    while(fgets(buffer,160,stdin))
    {
       TERMINATE(buffer);
-      key = parse(buffer,NCOMM,gKeyWords,gNumParam,gStrParam);
+      key = blParse(buffer,NCOMM,gKeyWords,gNumParam,gStrParam);
       switch(key)
       {
       case PARSE_ERRC:
@@ -308,6 +307,7 @@ BOOL DoParseLoop(PDB *pdb)
       }
       fprintf(stderr,"SSSearch> ");
    }
+   return(TRUE);
 }
 
 /*************************************************************************/
@@ -349,9 +349,9 @@ program\n");
 calculations\n\n");
 
    fprintf(stderr,"Current parameters are:\n");
-   fprintf(stderr,"C-alpha distance range: %lf %lf\n",
+   fprintf(stderr,"C-alpha distance range: %f %f\n",
            gCADist[0],gCADist[1]);
-   fprintf(stderr,"C-beta  distance range: %lf %lf\n",
+   fprintf(stderr,"C-beta  distance range: %f %f\n",
            gCBDist[0],gCBDist[1]);
    fprintf(stderr,"Prolines will%sbe included in the results\n\n",
           ((gDoProlines)?" ":" NOT ")); 
@@ -363,10 +363,11 @@ calculations\n\n");
    Display usage message or start of help message
 
    12.10.93 Original   By: ACRM
+   05.11.15 V1.2
 */
 void Usage(BOOL ShowUse)
 {
-   fprintf(stderr,"SSSearch V1.1 (c) 1993-6, Dr. A.C.R. Martin, SciTech \
+   fprintf(stderr,"SSSearch V1.2 (c) 1993-6, Dr. A.C.R. Martin, SciTech \
 Software, DKfz\n");
    fprintf(stderr,"This program is freely distributable providing no \
 profit is made in so doing\n");
@@ -377,7 +378,8 @@ specified ranges.\n\n");
    
    if(ShowUse)
    {
-      fprintf(stderr,"Usage: sssearch [>search.out] <file.pdb>\n\n");
+      fprintf(stderr,"Usage: sssearch file.pdb [>search.out]\n\n");
+      fprintf(stderr,"Type 'help' within the program for help\n\n");
    }
 }
 
@@ -388,6 +390,7 @@ specified ranges.\n\n");
 
    12.10.93 Original   By: ACRM
    04.07.96 Moved ; one space to right in output
+   05.11.15 Corrected %lf to %f in print statement
 */
 void DoCalculations(PDB *pdb)
 {
@@ -415,7 +418,7 @@ void DoCalculations(PDB *pdb)
    for(start1=pdb; start1!=NULL; start1 = end1)
    {
       /* Find next residue                                               */
-      end1 = FindEndPDB(start1);
+      end1 = blFindNextResidue(start1);
 
       /* Step through this residue looking for CA and CB                 */
       KeyCA = KeyCB = NULL;
@@ -431,7 +434,7 @@ void DoCalculations(PDB *pdb)
          for(start2=end1; start2!=NULL; start2 = end2)
          {
             /* Find next residue                                         */
-            end2 = FindEndPDB(start2);
+            end2 = blFindNextResidue(start2);
 
             /* Step through this residue looking for CA and CB           */
             CA = CB = NULL;
@@ -458,7 +461,7 @@ void DoCalculations(PDB *pdb)
                      DistCB <= gCBDist[1])
                   {
                      fprintf(tempfp,"%s %c%5d%c with %s %c%5d%c ; \
-CA %5.2lf, CB %5.2lf\n",
+CA %5.2f, CB %5.2f\n",
 KeyCA->resnam, KeyCA->chain[0], KeyCA->resnum, KeyCA->insert[0],
    CA->resnam,    CA->chain[0],    CA->resnum,    CA->insert[0],
    DistCA, DistCB);
@@ -479,10 +482,11 @@ KeyCA->resnam, KeyCA->chain[0], KeyCA->resnum, KeyCA->insert[0],
    store the unsorted results
 
    12.10.93 Original   By: ACRM
+   05.11.15 Updated for new GNU sort program
 */
 void DoRanking(void)
 {
-   system("sort +11n +9n sssearch.tmp");
+   system("sort -k 12n -k 10n sssearch.tmp");
    remove("sssearch.tmp");
 }
 
